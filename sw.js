@@ -1,7 +1,7 @@
 const DB_NAME = "mobile-html-poster-viewer";
 const DB_VERSION = 1;
 const FILE_STORE = "files";
-const CACHE_NAME = "mobile-html-poster-viewer-v3";
+const CACHE_NAME = "mobile-html-poster-viewer-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -97,6 +97,90 @@ function contentTypeForPath(path, storedType) {
   return types[extension] || storedType || "application/octet-stream";
 }
 
+const SAFARI_TEXT_FIX_STYLE = `
+<style id="mobile-html-poster-viewer-safari-text-fix">
+html, body {
+  -webkit-text-size-adjust: 100% !important;
+}
+body * {
+  text-rendering: auto !important;
+}
+body :where(p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, a, button, label, text, tspan) {
+  opacity: max(1, var(--mhpv-opacity, 1));
+}
+:where([style*="color: transparent" i], [style*="-webkit-text-fill-color: transparent" i]) {
+  color: #111 !important;
+  -webkit-text-fill-color: currentColor !important;
+  background-image: none !important;
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+}
+svg text,
+svg tspan,
+svg textPath {
+  fill: currentColor;
+  -webkit-text-fill-color: currentColor;
+  paint-order: fill stroke markers;
+}
+svg [fill="none"] text,
+svg text[fill="none"],
+svg tspan[fill="none"] {
+  fill: currentColor !important;
+}
+</style>
+`;
+
+const SAFARI_SVG_TEXT_FIX_STYLE = `
+<style id="mobile-html-poster-viewer-safari-svg-text-fix">
+text, tspan, textPath {
+  fill: currentColor;
+  -webkit-text-fill-color: currentColor;
+  paint-order: fill stroke markers;
+}
+text[fill="none"], tspan[fill="none"] {
+  fill: currentColor !important;
+}
+</style>
+`;
+
+function isTextCompatibilityRequest(request, url) {
+  if (url.searchParams.get("compat") === "safari-text") {
+    return true;
+  }
+
+  if (!request.referrer) {
+    return false;
+  }
+
+  try {
+    return new URL(request.referrer).searchParams.get("compat") === "safari-text";
+  } catch {
+    return false;
+  }
+}
+
+function injectBefore(text, pattern, injection) {
+  if (pattern.test(text)) {
+    return text.replace(pattern, `${injection}$&`);
+  }
+  return `${injection}\n${text}`;
+}
+
+function applyTextCompatibility(file, path) {
+  const extension = normalizePath(path).toLowerCase().split(".").pop();
+  if (!["html", "htm", "svg"].includes(extension)) {
+    return file.bytes;
+  }
+
+  const text = new TextDecoder("utf-8").decode(file.bytes);
+  const fixed =
+    extension === "svg"
+      ? injectBefore(text, /<\/svg\s*>/i, SAFARI_SVG_TEXT_FIX_STYLE)
+      : injectBefore(text, /<\/head\s*>/i, SAFARI_TEXT_FIX_STYLE);
+
+  return new TextEncoder().encode(fixed);
+}
+
 function parsePosterRequest(url) {
   const marker = "/__poster__/";
   const markerIndex = url.pathname.indexOf(marker);
@@ -124,7 +208,11 @@ self.addEventListener("fetch", (event) => {
             return new Response("Not found", { status: 404 });
           }
 
-          return new Response(file.bytes, {
+          const bytes = isTextCompatibilityRequest(event.request, requestUrl)
+            ? applyTextCompatibility(file, file.path || posterRequest.path)
+            : file.bytes;
+
+          return new Response(bytes, {
             headers: {
               "Content-Type": contentTypeForPath(file.path || posterRequest.path, file.mimeType),
               "Cache-Control": "no-store",
