@@ -1,7 +1,7 @@
 const DB_NAME = "mobile-html-poster-viewer";
 const DB_VERSION = 1;
 const FILE_STORE = "files";
-const CACHE_NAME = "mobile-html-poster-viewer-v1";
+const CACHE_NAME = "mobile-html-poster-viewer-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -80,6 +80,23 @@ async function getPosterFile(posterId, path) {
   }
 }
 
+function contentTypeForPath(path, storedType) {
+  const extension = normalizePath(path).toLowerCase().split(".").pop();
+  const types = {
+    html: "text/html",
+    htm: "text/html",
+    css: "text/css",
+    js: "text/javascript",
+    mjs: "text/javascript",
+    json: "application/json",
+    svg: "image/svg+xml",
+    txt: "text/plain",
+    xml: "application/xml",
+  };
+
+  return types[extension] || storedType || "application/octet-stream";
+}
+
 function parsePosterRequest(url) {
   const marker = "/__poster__/";
   const markerIndex = url.pathname.indexOf(marker);
@@ -109,7 +126,7 @@ self.addEventListener("fetch", (event) => {
 
           return new Response(file.bytes, {
             headers: {
-              "Content-Type": file.mimeType || "application/octet-stream",
+              "Content-Type": contentTypeForPath(file.path || posterRequest.path, file.mimeType),
               "Cache-Control": "no-store",
             },
           });

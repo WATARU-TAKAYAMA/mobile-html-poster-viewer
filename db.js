@@ -146,12 +146,12 @@ export async function deletePoster(id) {
 export function guessMimeType(path) {
   const extension = normalizePath(path).toLowerCase().split(".").pop();
   const types = {
-    html: "text/html; charset=utf-8",
-    htm: "text/html; charset=utf-8",
-    css: "text/css; charset=utf-8",
-    js: "text/javascript; charset=utf-8",
-    mjs: "text/javascript; charset=utf-8",
-    json: "application/json; charset=utf-8",
+    html: "text/html",
+    htm: "text/html",
+    css: "text/css",
+    js: "text/javascript",
+    mjs: "text/javascript",
+    json: "application/json",
     svg: "image/svg+xml",
     png: "image/png",
     jpg: "image/jpeg",
@@ -165,8 +165,8 @@ export function guessMimeType(path) {
     ttf: "font/ttf",
     otf: "font/otf",
     eot: "application/vnd.ms-fontobject",
-    txt: "text/plain; charset=utf-8",
-    xml: "application/xml; charset=utf-8",
+    txt: "text/plain",
+    xml: "application/xml",
     pdf: "application/pdf",
   };
 

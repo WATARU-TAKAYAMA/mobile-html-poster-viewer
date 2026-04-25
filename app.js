@@ -136,6 +136,15 @@ function findEntryCandidates(paths) {
     });
 }
 
+function isSystemEntry(path) {
+  return (
+    path === ".DS_Store" ||
+    path.startsWith("__MACOSX/") ||
+    path.endsWith("/.DS_Store") ||
+    /(^|\/)Thumbs\.db$/i.test(path)
+  );
+}
+
 function chooseEntry(candidates) {
   return new Promise((resolve) => {
     entryOptions.replaceChildren(
@@ -185,13 +194,18 @@ async function createPosterFromZip(zipFile, entries, entryFile) {
 }
 
 async function importZip(zipFile) {
+  if (zipFile.size > 40 * 1024 * 1024) {
+    setStatus("大きいZIPです", "iPhone/iPadでは取り込みに時間がかかることがあります。画面を閉じずにお待ちください。");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
   setStatus("ZIPを読み込んでいます", zipFile.name);
   const rawEntries = await readZipEntries(zipFile);
   const rawPaths = rawEntries.map((entry) => normalizePath(entry.name)).filter(Boolean);
   const strippedPaths = stripCommonRoot(rawPaths);
   const entries = rawEntries
     .map((entry, index) => ({ ...entry, path: normalizePath(strippedPaths[index]) }))
-    .filter((entry) => entry.path && !entry.path.includes("../"));
+    .filter((entry) => entry.path && !entry.path.includes("../") && !isSystemEntry(entry.path));
   const candidates = findEntryCandidates(entries.map((entry) => entry.path));
 
   if (!candidates.length) {

@@ -4,6 +4,9 @@ const posterFrame = document.querySelector("#posterFrame");
 const viewerTitle = document.querySelector("#viewerTitle");
 const viewerMessage = document.querySelector("#viewerMessage");
 const fullscreenButton = document.querySelector("#fullscreenButton");
+const directButton = document.querySelector("#directButton");
+
+let currentPosterUrl = "";
 
 function setMessage(message) {
   viewerMessage.textContent = message;
@@ -52,10 +55,17 @@ async function loadPoster() {
 
   document.title = poster.title;
   viewerTitle.textContent = poster.title;
-  posterFrame.src = virtualPosterUrl(poster);
+  currentPosterUrl = virtualPosterUrl(poster);
+  posterFrame.src = currentPosterUrl;
   posterFrame.hidden = false;
   viewerMessage.hidden = true;
 }
+
+directButton.addEventListener("click", () => {
+  if (currentPosterUrl) {
+    location.href = currentPosterUrl;
+  }
+});
 
 fullscreenButton.addEventListener("click", async () => {
   const target = posterFrame;
