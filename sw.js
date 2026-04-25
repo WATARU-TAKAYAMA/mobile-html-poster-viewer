@@ -1,7 +1,7 @@
 const DB_NAME = "mobile-html-poster-viewer";
 const DB_VERSION = 1;
 const FILE_STORE = "files";
-const CACHE_NAME = "mobile-html-poster-viewer-v2";
+const CACHE_NAME = "mobile-html-poster-viewer-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -83,15 +83,15 @@ async function getPosterFile(posterId, path) {
 function contentTypeForPath(path, storedType) {
   const extension = normalizePath(path).toLowerCase().split(".").pop();
   const types = {
-    html: "text/html",
-    htm: "text/html",
-    css: "text/css",
-    js: "text/javascript",
-    mjs: "text/javascript",
-    json: "application/json",
+    html: "text/html; charset=utf-8",
+    htm: "text/html; charset=utf-8",
+    css: "text/css; charset=utf-8",
+    js: "text/javascript; charset=utf-8",
+    mjs: "text/javascript; charset=utf-8",
+    json: "application/json; charset=utf-8",
     svg: "image/svg+xml",
-    txt: "text/plain",
-    xml: "application/xml",
+    txt: "text/plain; charset=utf-8",
+    xml: "application/xml; charset=utf-8",
   };
 
   return types[extension] || storedType || "application/octet-stream";

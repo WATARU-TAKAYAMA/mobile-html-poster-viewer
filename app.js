@@ -145,6 +145,104 @@ function isSystemEntry(path) {
   );
 }
 
+function textKind(path) {
+  const extension = normalizePath(path).toLowerCase().split(".").pop();
+  const kinds = {
+    html: "html",
+    htm: "html",
+    css: "css",
+    js: "text",
+    mjs: "text",
+    svg: "xml",
+    xml: "xml",
+    txt: "text",
+    json: "text",
+  };
+
+  return kinds[extension] || "";
+}
+
+function safeDecode(bytes, label, fatal = false) {
+  try {
+    return new TextDecoder(label, { fatal }).decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
+function declaredEncoding(bytes) {
+  const sample = safeDecode(bytes.slice(0, 4096), "windows-1252").toLowerCase();
+  const htmlMatch = sample.match(/charset\s*=\s*["']?\s*([a-z0-9._-]+)/i);
+  const xmlMatch = sample.match(/<\?xml[^>]+encoding\s*=\s*["']([^"']+)["']/i);
+  const label = (htmlMatch?.[1] || xmlMatch?.[1] || "").toLowerCase();
+  const aliases = {
+    sjis: "shift_jis",
+    "shift-jis": "shift_jis",
+    "shift_jis": "shift_jis",
+    cp932: "shift_jis",
+    "windows-31j": "shift_jis",
+    "x-sjis": "shift_jis",
+    utf8: "utf-8",
+    "utf-8": "utf-8",
+    eucjp: "euc-jp",
+    "euc_jp": "euc-jp",
+    "euc-jp": "euc-jp",
+    "iso-2022-jp": "iso-2022-jp",
+  };
+
+  return aliases[label] || label || "";
+}
+
+function decodeText(bytes) {
+  const declared = declaredEncoding(bytes);
+  if (declared) {
+    const decoded = safeDecode(bytes, declared);
+    if (decoded) return decoded;
+  }
+
+  const utf8 = safeDecode(bytes, "utf-8", true);
+  if (utf8) return utf8;
+
+  return safeDecode(bytes, "shift_jis") || safeDecode(bytes, "utf-8");
+}
+
+function ensureUtf8Declaration(text, kind) {
+  if (kind === "html") {
+    if (/charset\s*=/i.test(text)) {
+      return text.replace(/charset\s*=\s*["']?\s*[^"'\s>]+/i, "charset=utf-8");
+    }
+    if (/<head[^>]*>/i.test(text)) {
+      return text.replace(/<head([^>]*)>/i, '<head$1><meta charset="utf-8">');
+    }
+    return `<meta charset="utf-8">\n${text}`;
+  }
+
+  if (kind === "css") {
+    if (/^\s*@charset\s+["'][^"']+["'];/i.test(text)) {
+      return text.replace(/^\s*@charset\s+["'][^"']+["'];/i, '@charset "utf-8";');
+    }
+    return text;
+  }
+
+  if (kind === "xml") {
+    return text.replace(/<\?xml([^>]+)encoding\s*=\s*["'][^"']+["']([^>]*)\?>/i, '<?xml$1encoding="utf-8"$2?>');
+  }
+
+  return text;
+}
+
+function normalizeTextEntry(entry) {
+  const kind = textKind(entry.path);
+  if (!kind) return entry;
+
+  const text = ensureUtf8Declaration(decodeText(entry.bytes), kind);
+  return {
+    ...entry,
+    bytes: new TextEncoder().encode(text),
+    mimeType: guessMimeType(entry.path),
+  };
+}
+
 function chooseEntry(candidates) {
   return new Promise((resolve) => {
     entryOptions.replaceChildren(
@@ -168,12 +266,13 @@ async function createPosterFromZip(zipFile, entries, entryFile) {
   const now = Date.now();
   const id = `${now.toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
   const title = zipFile.name.replace(/\.zip$/i, "") || "Untitled poster";
-  const totalBytes = entries.reduce((sum, entry) => sum + entry.bytes.byteLength, 0);
-  const files = entries.map((entry) => ({
+  const normalizedEntries = entries.map(normalizeTextEntry);
+  const totalBytes = normalizedEntries.reduce((sum, entry) => sum + entry.bytes.byteLength, 0);
+  const files = normalizedEntries.map((entry) => ({
     key: fileKey(id, entry.path),
     posterId: id,
     path: entry.path,
-    mimeType: guessMimeType(entry.path),
+    mimeType: entry.mimeType || guessMimeType(entry.path),
     bytes: entry.bytes,
   }));
 
